@@ -12,7 +12,7 @@ use Getopt::Janus::SessionBase ();
 use Getopt::Janus (); # makes sure Getopt::Janus::DEBUG is defined
 BEGIN { *DEBUG = \&Getopt::Janus::DEBUG }
 
-DEBUG and print "Revving up ", __PACKAGE__, "\n";
+DEBUG and print "Revving up ", __PACKAGE__, " at debug=", DEBUG, "\n";
 
 use Tk ();
 use Carp ('confess');
@@ -575,7 +575,7 @@ sub _really_open_files_make_window {
 sub consider_open_files {
   my($self, $files, $dirs) = @_; # override in a subclass
 
-  DEBUG > 2 and print "Making a new window for ", scalar(@$files), "\n";
+  DEBUG > 2 and print "Making a new window for ", scalar(@$files), " files\n";
 
   my $run_flag;
   my $mainwindow
@@ -632,7 +632,7 @@ sub report_run_error {
     # make it non-editable, but selectable
   
   my $button = $m->Button(
-    '-text'    => 'Abort Program',
+    '-text'    => 'Abort the Program',
     '-command' => [$m, 'destroy'],
   );
   $m->bind('<Escape>' => [$m, 'destroy'] );

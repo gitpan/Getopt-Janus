@@ -1,4 +1,12 @@
-# ChangeLog for Getopt::Janus dist   # Time-stamp: "2003-04-18 21:47:34 AHDT"
+# ChangeLog for Getopt::Janus dist   # Time-stamp: "2003-06-07 20:13:18 ADT"
+
+2003-05-10  Sean M. Burke <sburke@cpan.org>
+        * Release 1.02 -- bugfix
+	* Better MacOS X support, thanks to help from Elaine Ashton and
+	Anno Siegel
+	* Fixed a minor bug in prep_option_new_file, relevent only in
+	"Reviewing Output of..." screen when using filenames other than
+	as suggested by "\e"-replacement.
 
 2003-05-10  Sean M. Burke <sburke@cpan.org>
         * Release 1.01 -- first public release

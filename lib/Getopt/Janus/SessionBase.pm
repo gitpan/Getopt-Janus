@@ -170,9 +170,19 @@ sub prep_option_yes_no {
 sub prep_option_new_file {
   my($self, $option) = @_;
   for my $slot ( $option->{'slot'} ) { # happy aliasing
-    push @Getopt::Janus::New_files,
-      ( $$slot = $self->_new_out( $$slot ) )
-     if defined $$slot and $$slot =~ m/\e/;
+    if( defined $$slot and $$slot =~ m/\e/ ) {
+      $$slot = $self->_new_out( $$slot );
+    }
+    if( defined $$slot and length $$slot) {
+      push @Getopt::Janus::New_files, $slot;
+      DEBUG and print "Potential new-file: $slot",
+        ref($slot) ? " ($$slot)" : '',
+        "\n  from ",
+        $option->{'long'} || $option->{'short'}, ".\n";
+    } else {
+      DEBUG and print "Snoozing thru new-file option ",
+        $option->{'long'} || $option->{'short'}, ".\n";
+    }
   }
   return;
 }
@@ -225,7 +235,8 @@ sub cleanup {
 }
 
 #==========================================================================
-sub can_open_new_files { return $^O =~ m/Win32/ };
+sub can_open_new_files { $^O =~ m/Win32/ or $^O =~ m/darwin/ };
+
 
 sub open_new_files {
   my($self, $them) = @_;
@@ -233,6 +244,14 @@ sub open_new_files {
     DEBUG and print "No files to consider.\n";
     return;
   }
+  
+  if(DEBUG > 1) {
+    print "Contents of new_files:\n";
+    foreach my $i (@$them) {
+      print "  [", ref($i) ? "$i = $$i" : $i, "]\n";
+    }
+  }
+  
   unless( $self->can_open_new_files() ) {
     DEBUG and print "can_open_new_files returns false.\n";
     return;
@@ -241,23 +260,49 @@ sub open_new_files {
   my(@files, @dirs, %seen);
   require File::Basename;
   foreach my $f (@$them) {
+    next unless defined $f;
+    $f = $$f if ref $f eq 'SCALAR';
     next unless defined $f and length $f;
+    
+    DEBUG > 2 and print "  Considering [$f]\n";
 
     return if $f eq ".NO."; # magic value
     
     next if $seen{$f}++; # no repeats
-    next unless -e $f and -r _;
+    unless( -e $f ) {
+      DEBUG and print "   $f doesn't exist\n";
+      next;
+    }
+    unless( -r _ ) {
+      DEBUG and print "   $f doesn't readable\n";
+      next;
+    }
+
     if(-f _) {
-      push @files, (-s _) ? $f : undef;
+      if(-s _) {
+        DEBUG and print "   A good file: $f\n";
+        push @files, $f;
+      } else {
+        DEBUG and print "   But it's 0-length: $f\n";
+        push @files, undef;
+      }
       my $d = File::Basename::dirname( $f );
       $d = '.' if $d eq $f or !length $d;
       push @dirs, $d;
     } elsif(-d _) {
+      DEBUG and print "  A dir: $f\n";
       push @dirs, $f;
       push @files, undef;
+    } else {
+      DEBUG and print "   Odd, what's a $f\n";
     }
   }
-  
+
+  if(DEBUG > 1) {
+    print "  \@files: @files\n";
+    print "  \@dirs : @dirs\n";
+  }
+
   if( @files or @dirs ) {
     DEBUG and print "Calling consider_open_files on ",
      scalar(@files), " items\n";
@@ -290,7 +335,26 @@ sub _cull_duplicates_open_files {
 
 sub _really_open_files {
   my($self, $files, $dirs) = @_;
-  if($^O =~ m/Win32/) {
+  
+  if($^O =~ m/darwin/) { 
+    # Thanks to Elaine Ashton and Anno Siegel for help on this
+    DEBUG and print "\n";
+    sleep 0;
+    foreach my $d (@$dirs) {
+      next unless defined $d and length $d;
+      DEBUG and print "Calling system 'open', $d\n";
+      system "open", $d;
+      sleep 0;
+    }
+    foreach my $f (@$files) {
+      next unless defined $f and length $f;
+      DEBUG and print "Calling system 'open', $f\n";
+      system "open", $f;
+      sleep 0;
+    }
+    DEBUG and print "\n";
+
+  } elsif($^O =~ m/Win32/) {
     DEBUG and print "\n";
     sleep 0;
     foreach my $d (@$dirs) {
@@ -363,6 +427,7 @@ sub _new_out {
   
   # Look for matching files:
   my $dir = File::Basename::dirname($in);
+  DEBUG > 2 and print "Dirname of [$in] is [$dir]\n";
   DEBUG > 1 and print "opendir on $dir for $in\n";
   $dir = '.' unless defined $dir;
   opendir(GOODINDIR, $dir) || confess "Can't opendir $dir: $!";
@@ -373,7 +438,7 @@ sub _new_out {
       next unless $this =~ $pattern;
       if( $1 > $max ) {
         $max = 0 + $1;
-        DEBUG > 2 and print " Hm, $this is highest so far.\n";
+        DEBUG > 5 and print " Hm, $this is highest so far.\n";
       }
     }
   }

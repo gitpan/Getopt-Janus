@@ -22,7 +22,7 @@ use vars qw(@ISA %EXPORT_TAGS @EXPORT $VERSION
 );
 @ISA = ('Exporter');
 %EXPORT_TAGS = ('ALL' => \@EXPORT);
-$VERSION = '1.01';
+$VERSION = '1.02';
 @EXPORT = qw{
  yes_no string file new_file choose
  license_artistic license_gnu license_either
