@@ -1,7 +1,7 @@
 
 require 5;
 package Getopt::Janus::SessionBase;
-$VERSION = '1.01';
+$VERSION = '1.03';
 use strict;
 use Getopt::Janus (); # makes sure Getopt::Janus::DEBUG is defined
 BEGIN { *DEBUG = \&Getopt::Janus::DEBUG }
@@ -230,20 +230,20 @@ sub run {
 
 sub cleanup {
   my $self = shift;
-  $self->open_new_files( \@Getopt::Janus::New_files );
+  $self->review_result( \@Getopt::Janus::New_files );
   return;
 }
 
 #==========================================================================
-sub can_open_new_files { $^O =~ m/Win32/ or $^O =~ m/darwin/ };
 
-
-sub open_new_files {
+sub review_result {
   my($self, $them) = @_;
+
   unless(@$them) {
     DEBUG and print "No files to consider.\n";
     return;
   }
+  require File::Basename;
   
   if(DEBUG > 1) {
     print "Contents of new_files:\n";
@@ -252,13 +252,7 @@ sub open_new_files {
     }
   }
   
-  unless( $self->can_open_new_files() ) {
-    DEBUG and print "can_open_new_files returns false.\n";
-    return;
-  }
-  
-  my(@files, @dirs, %seen);
-  require File::Basename;
+  my(@to_display, %seen, $f_out);
   foreach my $f (@$them) {
     next unless defined $f;
     $f = $$f if ref $f eq 'SCALAR';
@@ -281,100 +275,77 @@ sub open_new_files {
     if(-f _) {
       if(-s _) {
         DEBUG and print "   A good file: $f\n";
-        push @files, $f;
+        $f_out = $f;
       } else {
         DEBUG and print "   But it's 0-length: $f\n";
-        push @files, undef;
+        $f_out = undef;
       }
       my $d = File::Basename::dirname( $f );
       $d = '.' if $d eq $f or !length $d;
-      push @dirs, $d;
+      push @to_display, [$f    => $d];
     } elsif(-d _) {
       DEBUG and print "  A dir: $f\n";
-      push @dirs, $f;
-      push @files, undef;
+      push @to_display, [undef => $f];
     } else {
-      DEBUG and print "   Odd, what's a $f\n";
+      DEBUG and print "   Odd, what's a $f ?!\n";
     }
   }
 
   if(DEBUG > 1) {
-    print "  \@files: @files\n";
-    print "  \@dirs : @dirs\n";
-  }
-
-  if( @files or @dirs ) {
-    DEBUG and print "Calling consider_open_files on ",
-     scalar(@files), " items\n";
-    $self->consider_open_files(\@files, \@dirs);
-    DEBUG and print "Back from calling consider_open_files\n";
-  }
-  
-  return;
-}
-
-sub consider_open_files {
-  my($self, $files, $dirs) = @_; # override in a subclass
-  return;
-}
-
-sub _cull_duplicates_open_files {
-  my($self, $files, $dirs) = @_;
-  # @$files has already had duplicates removed
-  my %seen;
-  foreach my $d (@$dirs) {
-    next unless defined $d;
-    if(!length $d) {
-      undef $d;
-    } else {
-      undef $d if $seen{$d}++; # no repeats
+    print "Contents of to_display: [\n";
+    foreach my $i (@to_display) {
+      print "  [", ref($i) ? "$i = $$i" : $i, "]\n";
     }
+    print "]\n";
   }
+
+  $self->review_result_screen(\@to_display);
   return;
 }
 
-sub _really_open_files {
-  my($self, $files, $dirs) = @_;
+sub review_result_screen {
+  my($self, $to_display) = @_; # override in a subclass
+  return unless @$to_display;
+  return;
+}
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+sub can_open_files       { $^O =~ m/Win32/ or $^O =~ m/darwin/ };
+sub can_open_directories { $^O =~ m/Win32/ or $^O =~ m/darwin/ };
+
+sub open_directory {
+  my($self, $i) = @_;
+  return $self->open_file($i)
+   if $^O =~ m/Win32/ or $^O =~ m/darwin/;
+  return;
+}
+
+sub open_file {
+  my($self, $i) = @_;
   
   if($^O =~ m/darwin/) { 
     # Thanks to Elaine Ashton and Anno Siegel for help on this
-    DEBUG and print "\n";
+    return unless defined $i and length $i;
+    DEBUG and print "\nCalling system 'open', $i\n";
     sleep 0;
-    foreach my $d (@$dirs) {
-      next unless defined $d and length $d;
-      DEBUG and print "Calling system 'open', $d\n";
-      system "open", $d;
-      sleep 0;
-    }
-    foreach my $f (@$files) {
-      next unless defined $f and length $f;
-      DEBUG and print "Calling system 'open', $f\n";
-      system "open", $f;
-      sleep 0;
-    }
+    system "open", $i;
+    sleep 0;
     DEBUG and print "\n";
 
   } elsif($^O =~ m/Win32/) {
-    DEBUG and print "\n";
+    # Thanks to Elaine Ashton and Anno Siegel for help on this
+    return unless defined $i and length $i;
+    DEBUG and print "Calling system 'start', qq{\"$i\"}\n";
     sleep 0;
-    foreach my $d (@$dirs) {
-      next unless defined $d and length $d;
-      $d =~ tr{/}{\\};
-      DEBUG and print "Calling system 'start', qq{\"$d\"}\n";
-      system "start", qq{"$d"};
-      sleep 0;
-    }
-    foreach my $f (@$files) {
-      next unless defined $f and length $f;
-      $f =~ tr{/}{\\};
-      DEBUG and print "Calling system 'start', qq{\"$f\"}\n";
-      system "start", qq{"$f"};
-      sleep 0;
-    }
+    system "start", qq{"$i"};
+    sleep 0;
     DEBUG and print "\n";
   }
   return;
 }
+
+
 
 #==========================================================================
 

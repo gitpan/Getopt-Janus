@@ -4,7 +4,7 @@ package Getopt::Janus::CLI;
 # Get command-line interface options (yup, from @ARGV)
 
 @ISA = ('Getopt::Janus::SessionBase');
-$VERSION = '1.01';
+$VERSION = '1.03';
 use strict;
 use Getopt::Janus (); # makes sure Getopt::Janus::DEBUG is defined
 BEGIN { *DEBUG = \&Getopt::Janus::DEBUG }
@@ -17,6 +17,8 @@ sub open_new_files { }  # block it happening
 # TODO: make -h / --help produce help/longhelp (latter with license)
 
 # ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+
+sub review_result { }  # no need for this all
 
 sub get_option_values {
   my $self = shift;

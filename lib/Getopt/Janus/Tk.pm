@@ -5,7 +5,7 @@ package Getopt::Janus::Tk;
 
 
 @ISA = ('Getopt::Janus::SessionBase');
-$VERSION = '1.01';
+$VERSION = '1.03';
 use strict;
 use Getopt::Janus::SessionBase ();
 
@@ -505,15 +505,16 @@ sub _option_title { # operates on an option
 
 #==========================================================================
 
-sub _really_open_files_make_window {
-  my($self, $files, $dirs, $run_flag_r) = @_;
-
+sub review_result_screen {
+  my($self, $items) = @_;
+  return unless @$items;
+  DEBUG > 2 and print "Making a new window for ", scalar(@$items), " items\n";
   require Tk::Checkbutton;
 
   my $mainwindow = MainWindow->new;
   $mainwindow->title("Reviewing Output of $$self{'title'}");
   my $pane;
-  if(@$files < 4) {
+  if(@$items < 4) {
     $pane = $mainwindow;
   } else {
     $pane = $mainwindow->Scrolled( 'Pane',
@@ -524,88 +525,55 @@ sub _really_open_files_make_window {
     $pane->pack( '-fill' => 'both',  '-expand' => 1 );
   }
   
-  require Tk::Checkbutton;
-  foreach my $i (0 .. $#$files) {
-    my $f = \ $files->[$i];
-    my $d = \ $dirs->[ $i];
-    next unless defined $$f or defined $$d;
+  foreach my $i (@$items) {
+    my($f,$d) = @$i;
+    next unless defined $f or defined $d;
 
+    require Tk::Menubutton;
+    my $mb = $pane->Menubutton(
+       qw/ -relief raised -takefocus 1 -indicatoron 1 -direction right/,
+       -text => $f,
+    );
 
-    $pane->Label( '-text' => $$f ) -> pack;
-    foreach my $bit (['Open file', $f], ['Open directory', $d]) {
-      $pane->Checkbutton(
-        -text => $bit->[0],
-        defined( ${$bit->[1]} ) ? (
-          -variable => $bit->[1],    # a scalar ref to the real slot
-          -onvalue  => ${$bit->[1]}, # (initial (defined) value of slot)
-          -offvalue => '',
-        ) : ( '-state' => 'disabled' )
-      )
-      ->pack;
-    }
+    $mb->configure( -menu => $mb->menu(qw/-tearoff 0/) );
 
-    # Just a divider:
-    $pane->Frame(qw/ -relief ridge -bd 1 -height 3 /)->pack('-fill' => 'x' );
+    defined $f and $self->can_open_files and $mb->command(
+      -label => "Run this file",
+      -command =>  sub { $self->open_file($f) },
+    );
+
+    defined $f and $self->can_open_directories and $mb->command(
+      -label => "Open this directory",
+      -command =>  sub { $self->open_directory($d) },
+    );
+    defined $f and $self->can_open_files and $mb->command(
+      -label => "Copy this filespec", -command =>  sub {
+        $mainwindow->clipboardClear;
+        $mainwindow->clipboardAppend( '--', $f );
+      },
+    );
+    $mb->pack;
   }
 
-  # A frame for the buttons at the bottom:
+  # Just a divider:
+  $pane->Frame(qw/ -relief ridge -bd 1 -height 3 /)->pack('-fill' => 'x' );
+
+  # A frame for the button(s) at the bottom:
   my $button_bundle_frame = $pane->Frame();
-  #$button_bundle_frame->grid( qw< -columnspan 2  -sticky s > );
   $button_bundle_frame->pack;
-  my @button_pack_options = qw< -side left  -pady 9 -padx 9  >;
   
-  my $okay_button;
-  ($okay_button = $button_bundle_frame->Button(
-    '-text'    => 'OK',
-    '-command' => sub { $$run_flag_r = 1; $mainwindow->destroy; return; },
-  ))->pack( @button_pack_options,  );
-  
-  $button_bundle_frame->Button(
-    '-text'    => 'Cancel',
+  my $done_button;
+  ($done_button = $button_bundle_frame->Button(
+    '-text'    => 'Done',
     '-command' => [ $mainwindow => 'destroy' ],
-  )->pack(  @button_pack_options );
+  ))->pack( qw< -side left  -pady 9 -padx 9  > );
+  $done_button->focus;
 
   $mainwindow->bind('<Escape>' => [$mainwindow, 'destroy'] );
-  
-  $okay_button->focus;
-
-  return;
-}
-
-sub consider_open_files {
-  my($self, $files, $dirs) = @_; # override in a subclass
-
-  DEBUG > 2 and print "Making a new window for ", scalar(@$files), " files\n";
-
-  my $run_flag;
-  my $mainwindow
-   = $self->_really_open_files_make_window( $files, $dirs, \$run_flag);
-
-  my $showcontents;
-  DEBUG and $showcontents = sub {
-    print "Contents of \@files: ",
-     map( (defined($_) ? qq{"$_" } : 'undef'), @$files), "\n";
-    print "Contents of \@dirs: ",
-     map( (defined($_) ? qq{"$_" } : 'undef'), @$dirs), "\n";
-  };
-  &$showcontents if DEBUG > 2;
 
   DEBUG and print "\n";
   Tk::MainLoop();
   DEBUG and print "\n";
-  if($run_flag) {
-    DEBUG > 1 and print "User hit Okay...\n";
-  } else {
-    DEBUG > 1 and print "User hit Cancel.\n";
-    return;
-  }
-
-  &$showcontents, print "Culling duplicates...\n" if DEBUG > 2;
-  $self->_cull_duplicates_open_files($files, $dirs);
-  &$showcontents if DEBUG > 2;
-  
-  $self->_really_open_files($files, $dirs);
-
   return;
 }
 
